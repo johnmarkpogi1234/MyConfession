@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heartnote – Say What Your Heart Can't</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{--bg1:#fff0f5;--bg2:#ffd6e7;--ink:#3b1030;--mute:#7a4a69;--card:rgba(255,255,255,.62);--bd:rgba(255,255,255,.8);--pri:#e11d5a;--pri2:#ff6b9a;--sh:0 10px 40px rgba(225,29,90,.18);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#1d0a24;--bg2:#3a1245;--ink:#ffe9f2;--mute:#d6a9c4;--card:rgba(255,255,255,.08);--bd:rgba(255,255,255,.16);--sh:0 10px 40px rgba(0,0,0,.4)}}
+:root[data-theme="dark"]{--bg1:#1d0a24;--bg2:#3a1245;--ink:#ffe9f2;--mute:#d6a9c4;--card:rgba(255,255,255,.08);--bd:rgba(255,255,255,.16);--sh:0 10px 40px rgba(0,0,0,.4)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100vh;font:16px/1.55 Inter,system-ui,sans-serif;color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2));background-attachment:fixed;overflow-x:hidden}
+h1,h2{font-family:'Playfair Display',Georgia,serif;line-height:1.1;margin:0 0 .5em}
+h1{font-size:clamp(2.4rem,9vw,4.6rem)}h2{font-size:clamp(1.7rem,6vw,2.6rem)}
+#app{position:relative;z-index:2;max-width:760px;margin:0 auto;padding:20px 18px 60px;animation:in .5s ease}
+@keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+.logo{font:600 1.3rem 'Playfair Display',serif;cursor:pointer;background:none;border:0;color:var(--ink)}
+.card{background:var(--card);border:1px solid var(--bd);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:26px;padding:26px;box-shadow:var(--sh);margin-bottom:18px}
+.btn{font:600 1rem Inter,sans-serif;min-height:48px;padding:12px 26px;border-radius:999px;border:0;cursor:pointer;color:#fff;background:linear-gradient(135deg,var(--pri),var(--pri2));box-shadow:0 8px 22px rgba(225,29,90,.35);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px) scale(1.03)}.btn.g{background:var(--card);color:var(--ink);border:1px solid var(--bd);box-shadow:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+label{display:block;font-weight:600;margin:14px 0 6px;font-size:.92rem}label i{font-weight:400;color:var(--mute)}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;min-height:46px}
+input:focus,textarea:focus{outline:2px solid var(--pri2)}textarea{min-height:120px;resize:vertical}
+.err{color:#e11d48;font-size:.9rem;min-height:1.2em;margin-top:8px}
+.link{word-break:break-all;font:.85rem monospace;padding:12px;border-radius:12px;background:var(--card);border:1px dashed var(--pri2);max-height:90px;overflow:auto}
+.mute{color:var(--mute);font-size:.9rem}.c{text-align:center}
+.msg{font:italic 500 1.25rem/1.6 'Playfair Display',serif;white-space:pre-wrap;animation:in 1s .3s both}
+#qr svg{width:180px;height:180px;background:#fff;padding:8px;border-radius:12px}
+.hearts{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.hearts span{position:absolute;bottom:-40px;opacity:.5;animation:fl linear infinite}
+@keyframes fl{to{transform:translateY(-115vh) rotate(25deg);opacity:0}}
+#no{transition:left .45s cubic-bezier(.34,1.56,.64,1),top .45s cubic-bezier(.34,1.56,.64,1)}
+canvas#cf{position:fixed;inset:0;z-index:50;pointer-events:none}
+.pop{animation:pop .6s cubic-bezier(.34,1.56,.64,1)}@keyframes pop{from{transform:scale(.3);opacity:0}}
+.tag{display:inline-block;padding:4px 12px;border-radius:99px;background:var(--card);border:1px solid var(--bd);font-size:.85rem}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="hearts" id="hearts" aria-hidden="true"></div><canvas id="cf"></canvas>
+<div id="app"></div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s),app=$("#app"),BASE=location.href.split("#")[0];
+const h=(t,a={},...k)=>{const e=document.createElement(t);for(const[n,v]of Object.entries(a)){if(n==="on")for(const[ev,f]of Object.entries(v))e.addEventListener(ev,f);else if(n==="class")e.className=v;else e.setAttribute(n,v)}for(const c of k.flat())if(c!=null)e.append(c.nodeType?c:document.createTextNode(c));return e};
+/* ---------- data layer (localStorage; swap these 3 fns for a real DB) ---------- */
+const mem={};const KEY="heartnote:v1";
+const db={all(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch{return {...mem}}},
+ save(o){try{localStorage.setItem(KEY,JSON.stringify(o))}catch{Object.assign(mem,o)}},
+ get(id){return this.all()[id]||null},
+ put(c){const o=this.all();if(o[c.id])throw new Error("id collision");o[c.id]=c;this.save(o)},
+ update(id,p){const o=this.all();if(!o[id])return false;Object.assign(o[id],p);this.save(o);return true},
+ del(id){const o=this.all();delete o[id];this.save(o)}};
+/* ---------- utils ---------- */
+const newId=()=>{const a=new Uint8Array(6);crypto.getRandomValues(a);const id=[...a].map(x=>"abcdefghjkmnpqrstuvwxyz23456789"[x%31]).join("");return db.get(id)?newId():id};
+const enc=o=>{const b=new TextEncoder().encode(JSON.stringify(o));let s="";b.forEach(x=>s+=String.fromCharCode(x));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")};
+const dec=s=>{try{s=s.replace(/-/g,"+").replace(/_/g,"/");const b=atob(s);return JSON.parse(new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0))))}catch{return null}};
+const clean=(v,n)=>String(v||"").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F<>]/g,"").trim().slice(0,n);
+const shareUrl=c=>`${BASE}#/confess/${c.id}.${enc({i:c.id,c:c.creatorName,r:c.recipientName,n:c.nickname,g:c.greeting,m:c.message,q:c.dateQuestion})}`;
+const toast=t=>{const e=h("div",{class:"card",style:"position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99;padding:12px 22px;margin:0"},t);document.body.append(e);setTimeout(()=>e.remove(),1800)};
+const copy=async t=>{try{await navigator.clipboard.writeText(t)}catch{const x=h("textarea");document.body.append(x);x.value=t;x.select();document.execCommand("copy");x.remove()}toast("Copied ❤️")};
+const go=p=>{location.hash=p};
+/* ---------- chrome ---------- */
+for(let i=0;i<14;i++)$("#hearts").append(h("span",{style:`left:${Math.random()*100}%;font-size:${14+Math.random()*22}px;animation-duration:${9+Math.random()*10}s;animation-delay:${-Math.random()*15}s`},["❤️","💗","💕","🌸"][i%4]));
+const root=document.documentElement;
+const nav=()=>h("nav",{},h("button",{class:"logo",on:{click:()=>go("")}},"💌 Heartnote"),h("div",{class:"row",style:"margin:0"},
+ h("button",{class:"btn g",on:{click:()=>go("/mine")}},"My confessions"),
+ h("button",{class:"btn g","aria-label":"Toggle light/dark mode",on:{click:()=>{const d=root.dataset.theme==="dark"||(!root.dataset.theme&&matchMedia("(prefers-color-scheme:dark)").matches);root.dataset.theme=d?"light":"dark"}}},"🌓")));
+const page=(...k)=>{app.replaceChildren(...k);app.style.animation="none";void app.offsetWidth;app.style.animation="";scrollTo(0,0)};
+/* ---------- views ---------- */
+const landing=()=>page(nav(),h("div",{class:"c",style:"padding:40px 0"},
+ h("span",{class:"tag"},"✨ private · personal · playful"),h("h1",{style:"margin-top:18px"},"Say What Your Heart Can't"),
+ h("p",{class:"mute",style:"font-size:1.1rem;max-width:520px;margin:0 auto 26px"},"Write a heartfelt confession, make it yours, and send it through a private link only they can open."),
+ h("button",{class:"btn pop",on:{click:()=>go("/create")}},"Create a Confession 💌")),
+ h("div",{class:"card c"},"1 · Write it    2 · Share the link    3 · Watch them smile ❤️"));
+let draft={};
+const create=()=>{const f=(k,l,ph,ta,max)=>[h("label",{for:k},l),h(ta?"textarea":"input",{id:k,placeholder:ph,maxlength:max,value:draft[k]||""})];
+ const form=h("div",{class:"card"},h("h2",{},"Write your confession"),
+ ...f("creatorName","Your name","Mark",0,40),...f("recipientName","Their name","Sarah",0,40),
+ ...f("nickname","Nickname (optional)","e.g. Sunshine",0,30),...f("greeting","Custom greeting (optional)","There's something I've been wanting to tell you...",0,100),
+ ...f("message","Your confession","I've been wanting to tell you this for a while…",1,1200),
+ ...f("dateQuestion","Date invitation (optional)","Will you go on a date with me?",0,120),
+ h("div",{class:"err",id:"err",role:"alert"}),h("div",{class:"row"},h("button",{class:"btn g",on:{click:()=>{const c=read();if(c)showPreview(c)}}},"Preview 👀"),h("button",{class:"btn",on:{click:()=>{const c=read();if(!c)return;try{c.id=newId();c.createdAt=new Date().toISOString();c.response=null;c.respondedAt=null;db.put(c);draft={};go("/ready/"+c.id)}catch{$("#err").textContent="Couldn't save. Check storage permissions and try again."}}}},"Generate link ❤️")));
+ const read=()=>{const v=k=>$("#"+k).value;draft={};["creatorName","recipientName","nickname","greeting","message","dateQuestion"].forEach(k=>draft[k]=v(k));
+  const c={creatorName:clean(draft.creatorName,40),recipientName:clean(draft.recipientName,40),nickname:clean(draft.nickname,30),greeting:clean(draft.greeting,100),message:clean(draft.message,1200),dateQuestion:clean(draft.dateQuestion,120)||"Will you go on a date with me?"};
+  const e=!c.creatorName?"Please add your name.":!c.recipientName?"Please add their name.":c.message.length<5?"Your message is empty or too short.":"";$("#err").textContent=e;return e?null:c};
+ page(nav(),form)};
+const showPreview=c=>{const p={...c,id:"preview"};page(nav(),h("p",{class:"mute c"},"This is how they'll see it 👇"),confCard(p,true),h("div",{class:"row",style:"justify-content:center"},h("button",{class:"btn g",on:{click:create}},"← Keep editing")))};
+const ready=id=>{const c=db.get(id);if(!c)return nf();const u=shareUrl(c);const qr=qrcode(0,"M");qr.addData(u);qr.make();
+ page(nav(),h("div",{class:"card c"},h("h2",{},"Your confession is ready ❤️"),h("p",{class:"mute"},"Anyone with this link can view your confession."),
+ h("div",{class:"link"},u),h("div",{class:"row",style:"justify-content:center"},
+  h("button",{class:"btn",on:{click:()=>copy(u)}},"Copy Link"),
+  h("button",{class:"btn",on:{click:async()=>{if(navigator.share)try{await navigator.share({title:"A message for you ❤️",url:u})}catch{}else copy(u)}}},"Share"),
+  h("button",{class:"btn g",on:{click:()=>window.open(u,"_blank")}},"Preview"),
+  h("button",{class:"btn g",on:{click:()=>go("/create")}},"Create Another")),
+ h("div",{id:"qr",style:"margin:22px auto 4px",innerHTML:qr.createSvgTag({cellSize:4,margin:0,scalable:true})}),
+ h("p",{class:"mute"},"Scan to open · ID "+c.id),h("button",{class:"btn g",on:{click:()=>go("/mine")}},"See status")))};
+const stat=c=>c.response==="yes"?`${c.recipientName} said YES! 🎉`:"Waiting for response ❤️";
+const mine=()=>{const l=Object.values(db.all()).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+ page(nav(),h("h2",{},"My confessions"),l.length?l.map((c,i)=>h("div",{class:"card"},h("b",{},`#${l.length-i} · To ${c.recipientName}`),h("p",{class:"mute"},new Date(c.createdAt).toLocaleString()+" · /confess/"+c.id),h("p",{},stat(c)),
+ h("div",{class:"row"},h("button",{class:"btn g",on:{click:()=>go("/ready/"+c.id)}},"Link & QR"),h("button",{class:"btn g",on:{click:()=>{if(confirm("Delete this confession? Its link will keep working for anyone who has it."))db.del(c.id),mine()}}},"Delete")))):h("div",{class:"card c"},"Nothing here yet.",h("div",{class:"row",style:"justify-content:center"},h("button",{class:"btn",on:{click:()=>go("/create")}},"Create one"))))};
+const nf=()=>page(nav(),h("div",{class:"card c"},h("h2",{},"Oops! This confession could not be found. ❤️"),h("p",{class:"mute"},"The link may be incomplete or the confession was deleted."),h("button",{class:"btn",on:{click:()=>go("/create")}},"Create Your Own Confession")));
+/* ---------- recipient ---------- */
+let tries=0;
+function confCard(c,preview){const name=c.nickname||c.recipientName;const box=h("div",{class:"card c",style:"margin-top:20px"},
+ h("h1",{style:"font-size:clamp(2rem,8vw,3.2rem)"},`Hey ${name} ❤️`),
+ h("p",{class:"mute"},c.greeting||"There's something I've been wanting to tell you..."),
+ h("div",{class:"card",style:"margin:18px 0"},h("div",{class:"msg"},c.message)),
+ h("p",{style:"font:600 1.5rem 'Playfair Display',serif;animation:in 1s 1s both"},c.dateQuestion+" ❤️"),
+ h("p",{class:"mute",style:"font-size:.8rem"},"— "+c.creatorName));
+ const area=h("div",{style:"min-height:150px;animation:in 1s 1.4s both"});
+ const yes=h("button",{class:"btn",style:"font-size:1.3rem;padding:16px 44px",on:{click:()=>{if(preview)return toast("Preview only 😉");celebrate(c)}}},"YES ❤️");
+ const no=h("button",{id:"no",class:"btn g",style:"position:relative;font-size:1rem",on:{pointerenter:e=>e.pointerType==="mouse"&&dodge(no,yes),touchstart:e=>{e.preventDefault();dodge(no,yes)},click:()=>dodge(no,yes)}},"NO");
+ const out=h("button",{class:"mute",style:"background:none;border:0;text-decoration:underline;cursor:pointer;margin-top:18px;padding:12px",on:{click:()=>preview?toast("Preview only"):decline(c)}},"I'd rather not");
+ area.append(h("div",{class:"row",style:"justify-content:center;align-items:center"},yes,no),h("div",{},out));box.append(area);
+ if(!preview)addEventListener("keydown",function k(e){if(e.key==="Escape"){removeEventListener("keydown",k);decline(c)}});return box}
+function dodge(b,yes){tries++;const r=b.getBoundingClientRect(),W=innerWidth,H=innerHeight,m=10;b.style.position="fixed";
+ const d=60+tries*55,a=Math.random()*6.28;let x=(r.left||W/2)+Math.cos(a)*d,y=(r.top||H/2)+Math.sin(a)*d;
+ x=Math.min(Math.max(m,x),W-r.width-m);y=Math.min(Math.max(m+env(),y),H-r.height-m);b.style.left=x+"px";b.style.top=y+"px";b.style.zIndex=20;yes.style.transform=`scale(${Math.min(1+tries*.06,1.5)})`;b.textContent=["NO","no?","really?","pls 🥺","…","hehe"][tries%6]}
+const env=()=>0;
+const decline=c=>page(h("div",{class:"card c",style:"margin-top:40px"},h("h2",{},"Thanks for being honest 🤍"),h("p",{},`${c.creatorName} will understand. It took courage to say this, and it takes kindness to answer honestly.`),h("button",{class:"btn g",on:{click:()=>go("")}},"Close")));
+function celebrate(c){burst();page(h("div",{class:"c pop",style:"padding-top:18vh"},h("h1",{},"IT'S A DATE! ❤️"),h("h2",{},"Can't wait to see you! 🎉")));
+ setTimeout(()=>page(h("div",{class:"card c pop",style:"margin-top:40px"},h("h2",{},"❤️ It's a Date! ❤️"),h("p",{},"Thank you for saying yes."),h("p",{},`${c.creatorName} is going to be very happy.`),h("p",{class:"mute"},"You've officially accepted the date invitation."),
+ h("div",{class:"row",style:"justify-content:center"},h("button",{class:"btn",on:{click:()=>reply(c)}},"Send a message"),h("button",{class:"btn g",on:{click:()=>go("")}},"Close")))),2400)}
+function reply(c){const t=h("textarea",{maxlength:200,placeholder:"Can't wait! 😊"});page(h("div",{class:"card"},h("h2",{},"Send a message"),t,h("p",{class:"mute"},"This creates a private reply link to send back to "+c.creatorName+"."),
+ h("button",{class:"btn",on:{click:async()=>{const u=`${BASE}#/reply/${c.id}.${enc({r:"yes",m:clean(t.value,200),t:Date.now()})}`;if(navigator.share)try{await navigator.share({title:"My reply ❤️",url:u});return}catch{}copy(u)}}},"Send reply")))}
+function confess(p){const[id,pl]=p.split(".");const d=pl&&dec(pl);if(!d||!d.c||!d.r||!d.m||d.i!==id)return nf();
+ page(confCard({id,creatorName:clean(d.c,40),recipientName:clean(d.r,40),nickname:clean(d.n,30),greeting:clean(d.g,100),message:clean(d.m,1200),dateQuestion:clean(d.q,120)||"Will you go on a date with me?"},false))}
+function replyIn(p){const[id,pl]=p.split(".");const d=pl&&dec(pl),c=db.get(id);
+ if(!d||d.r!=="yes"||!c)return page(nav(),h("div",{class:"card c"},h("h2",{},"Reply received 💌"),h("p",{class:"mute"},"Open this link in the browser where you created the confession to update its status.")));
+ db.update(id,{response:"yes",respondedAt:new Date().toISOString()});burst();
+ page(nav(),h("div",{class:"card c pop"},h("h2",{},`${c.recipientName} said YES! 🎉`),d.m?h("div",{class:"card msg"},clean(d.m,200)):null,h("button",{class:"btn",on:{click:()=>go("/mine")}},"My confessions")))}
+/* ---------- confetti ---------- */
+function burst(){const cv=$("#cf"),x=cv.getContext("2d");cv.width=innerWidth;cv.height=innerHeight;const P=Array.from({length:130},(_,i)=>({x:cv.width/2,y:cv.height/2,vx:(Math.random()-.5)*16,vy:Math.random()*-16-3,s:6+Math.random()*8,c:["#e11d5a","#ff6b9a","#fff","#ffd166","#a855f7"][i%5],h:i%4===0,r:Math.random()*6}));let f=0;
+ (function t(){x.clearRect(0,0,cv.width,cv.height);P.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.2;x.fillStyle=p.c;if(p.h){x.font=p.s*2+"px serif";x.fillText("❤",p.x,p.y)}else{x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillRect(0,0,p.s,p.s/2);x.restore()}});if(++f<200)requestAnimationFrame(t);else x.clearRect(0,0,cv.width,cv.height)})()}
+/* ---------- router ---------- */
+function route(){tries=0;const p=location.hash.slice(1);let m;
+ try{if(m=p.match(/^\/confess\/(.+)$/))confess(m[1]);else if(m=p.match(/^\/reply\/(.+)$/))replyIn(m[1]);else if(m=p.match(/^\/ready\/(\w+)$/))ready(m[1]);else if(p==="/create")create();else if(p==="/mine")mine();else if(p==="")landing();else nf()}
+ catch(e){page(nav(),h("div",{class:"card c"},h("h2",{},"Something went wrong"),h("p",{class:"mute"},"Please check your connection and try again."),h("button",{class:"btn",on:{click:()=>go("")}},"Home")))}}
+addEventListener("hashchange",route);route();
+</script></body></html>
