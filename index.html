@@ -83,8 +83,12 @@ const Store={key:'confessions.v1',
  put(c){const a=this.all();a[c.id]=c;return this.save(a)},
  remove(id){const a=this.all();if(a[id]){a[id].deleted=true;a[id].message='';return this.save(a)}return false},
  newId(){const a=this.all();let id;const ch='abcdefghjkmnpqrstuvwxyz23456789';do{id=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>ch[x%ch.length]).join('')}while(a[id]);return id}};
-const linkFor=c=>{const base=location.href.split('#')[0];const d={r:c.recipientName,n:c.nickname,c:c.creatorName,m:c.message,q:c.dateQuestion,g:c.greeting};return `${base}#/confess/${c.id}?d=${b64e(d)}`};
-const fromPayload=(id,s)=>{try{const d=b64d(s);return{id,recipientName:clean(d.r,40),nickname:clean(d.n,40),creatorName:clean(d.c,40),message:clean(d.m,1200),dateQuestion:clean(d.q,160),greeting:clean(d.g,120),response:null}}catch{return null}};
+const DQ='Will you go on a date with me?';
+const u8=b=>btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const un8=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),x=>x.charCodeAt(0));
+const pipe=async(bytes,S)=>new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new S('deflate-raw'))).arrayBuffer());
+const linkFor=async c=>{const base=location.href.split('#')[0];const raw=new TextEncoder().encode(JSON.stringify([c.recipientName,c.nickname,c.creatorName,c.message,c.dateQuestion===DQ?'':c.dateQuestion,c.greeting]));let p;try{p='z'+u8(await pipe(raw,CompressionStream))}catch{p='p'+u8(raw)}return `${base}#/c/${c.id}?d=${p}`};
+const fromPayload=async(id,s)=>{try{let a;if(s[0]==='z')a=JSON.parse(new TextDecoder().decode(await pipe(un8(s.slice(1)),DecompressionStream)));else if(s[0]==='p')a=JSON.parse(new TextDecoder().decode(un8(s.slice(1))));else{const d=b64d(s);a=[d.r,d.n,d.c,d.m,d.q,d.g]}return{id,recipientName:clean(a[0],40),nickname:clean(a[1],40),creatorName:clean(a[2],40),message:clean(a[3],1200),dateQuestion:clean(a[4],160)||DQ,greeting:clean(a[5],120),response:null}}catch{return null}};
 
 /* ---------- background hearts / theme ---------- */
 (()=>{const bg=$('#bg');if(reduce)return;for(let i=0;i<14;i++){const s=el('span',{},['❤','💗','💖','✨'][i%4]);s.style.cssText=`left:${Math.random()*100}%;font-size:${14+Math.random()*22}px;animation-duration:${9+Math.random()*10}s;animation-delay:${-Math.random()*14}s`;bg.append(s)}})();
@@ -110,7 +114,7 @@ function route(){document.removeEventListener('keydown',escHandler);$('#fx').get
  if(seg[0]==='create')return pageCreate(draft);
  if(seg[0]==='mine')return pageMine();
  if(seg[0]==='done'&&seg[1])return pageDone(seg[1]);
- if(seg[0]==='confess')return pageConfession(seg[1],new URLSearchParams(q).get('d'));
+ if(seg[0]==='confess'||seg[0]==='c')return pageConfession(seg[1],new URLSearchParams(q).get('d'));
  pageLanding()}
 
 /* ---------- pages ---------- */
@@ -136,7 +140,7 @@ function pageCreate(d){
    el('div',{class:'row'},el('button',{class:'btn ghost',onclick:prev},'👀 Preview'),el('button',{class:'btn',onclick:gen},'Generate my link ❤️'))))}
 const mk=d=>({id:Store.newId(),creatorName:d.creatorName,recipientName:d.recipientName,nickname:d.nickname||'',message:d.message,greeting:d.greeting||'',dateQuestion:d.dateQuestion||'Will you go on a date with me?',createdAt:new Date().toISOString(),response:null,respondedAt:null,deleted:false});
 
-function pageDone(id){const c=Store.get(id);if(!c||c.deleted)return notFound();const url=linkFor(c);
+async function pageDone(id){const c=Store.get(id);if(!c||c.deleted)return notFound();const url=await linkFor(c);
  const qr=el('div',{class:'qr'});try{new QRCode(qr,{text:url,width:176,height:176,colorDark:'#3b0a45',colorLight:'#ffffff'})}catch{qr.textContent='QR unavailable';}
  const copy=async()=>{try{await navigator.clipboard.writeText(url);toast('Link copied ❤️')}catch{box.select();document.execCommand('copy');toast('Link copied ❤️')}};
  const share=async()=>{if(navigator.share){try{await navigator.share({title:'A message for you ❤️',text:`${c.creatorName} has something to tell you…`,url})}catch{}}else copy()};
@@ -156,9 +160,9 @@ function pageMine(){const list=Object.values(Store.all()).filter(c=>!c.deleted).
 
 function notFound(){show(el('div',{class:'stage'},el('div',{class:'card'},el('h2',{},'Oops! This confession could not be found. ❤️'),el('p',{style:'color:var(--mut)'},'The link may be incorrect, incomplete, or the confession was deleted.'),el('div',{class:'row'},el('button',{class:'btn',onclick:()=>{draft={};go('create')}},'Create Your Own Confession')))))}
 
-function pageConfession(id,payload){if(!id)return notFound();let c=Store.get(id);
+async function pageConfession(id,payload){if(!id)return notFound();let c=Store.get(id);
  if(c&&c.deleted)return notFound();
- if(!c){if(!payload)return notFound();c=fromPayload(id,payload);if(!c||!c.message)return notFound();c.createdAt=new Date().toISOString();c.recipientCopy=true}
+ if(!c){if(!payload)return notFound();c=await fromPayload(id,payload);if(!c||!c.message)return notFound();c.createdAt=new Date().toISOString();c.recipientCopy=true}
  renderConfession(c,{})}
 
 /* ---------- recipient experience ---------- */
@@ -184,7 +188,7 @@ function renderConfession(c,{preview=false,back=''}={}){
   const ta=el('textarea',{maxlength:300,placeholder:'Write a little reply… (optional)',style:'min-height:80px'});
   const sent=el('p',{style:'color:var(--mut)'});
   const ack=()=>show(el('div',{class:'stage'},el('div',{class:'card'},el('h2',{},'❤️ It\u2019s a Date! ❤️'),el('p',{class:'msg',style:'animation-delay:.2s'},'Thank you for saying yes.'),el('p',{},`${c.creatorName} is going to be very happy.`),el('p',{style:'color:var(--mut)'},'You\u2019ve officially accepted the date invitation.'),ta,
-   el('div',{class:'row'},el('button',{class:'btn ghost',onclick:()=>{const m=clean(ta.value,300);if(!m)return toast('Write something first 💌');const s=Store.get(c.id);if(!preview){const o=s||c;o.reply=m;Store.put(o)}sent.textContent='Message sent 💌 (shared on this device).';ta.value=''}},'Send a message 💌'),el('button',{class:'btn',onclick:()=>preview?renderConfession(c,{preview,back}):(location.hash.includes('confess')?(history.length>1&&window.close(),show(el('div',{class:'stage'},el('p',{class:'ask'},'See you soon ❤️')))):go(''))},preview?'Close preview':'Close')),sent)));
+   el('div',{class:'row'},el('button',{class:'btn ghost',onclick:()=>{const m=clean(ta.value,300);if(!m)return toast('Write something first 💌');const s=Store.get(c.id);if(!preview){const o=s||c;o.reply=m;Store.put(o)}sent.textContent='Message sent 💌 (shared on this device).';ta.value=''}},'Send a message 💌'),el('button',{class:'btn',onclick:()=>preview?renderConfession(c,{preview,back}):((location.hash.startsWith('#/c/')||location.hash.includes('confess'))?(history.length>1&&window.close(),show(el('div',{class:'stage'},el('p',{class:'ask'},'See you soon ❤️')))):go(''))},preview?'Close preview':'Close')),sent)));
   show(el('div',{class:'stage'},el('h1',{class:'ask',style:'font-size:clamp(2.2rem,9vw,4rem)'},'IT\u2019S A DATE! ',el('span',{class:'pulse'},'❤️')),el('p',{class:'ask'},`${c.creatorName} — ${c.recipientName} said YES! 🎉`),el('p',{style:'color:var(--mut)'},'Can\u2019t wait to see you! ❤️')));
   setTimeout(ack,2800)};
  yes.onclick=celebrateYes;
